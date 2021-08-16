@@ -1,10 +1,11 @@
 on: [push]
-name: build
+name: test
 jobs:
   runhaskell:
-    name: Hello World
+    name: Run Tests
     runs-on: ubuntu-latest # or macOS-latest, or windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: haskell/actions/setup@v1
+      - uses: freckle/stack-cache-action@main
       - run: stack test --coverage
