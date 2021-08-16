@@ -1,26 +1,26 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE MultiWayIf      #-}
+{-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies    #-}
 
 module Preproc
     ( preprocess, buildPreprocStream, traverseStream, PreprocStream(..)
     ) where
 
-import System.Process (readProcessWithExitCode)
-import System.IO (FilePath)
-import System.Exit (ExitCode(ExitSuccess))
-import Text.Megaparsec.Stream
-import Data.Proxy
-import Data.Char (isSpace, isDigit)
-import Data.List.NonEmpty (NonEmpty((:|)))
-import Data.Maybe ( fromMaybe, isJust )
-import Data.List
-import Text.Megaparsec
-import Text.Megaparsec.Pos
 import qualified Control.Monad.Trans.State as StateM
-import GHC.RTS.Flags (MiscFlags(installSEHHandlers))
+import           Data.Char                 (isDigit, isSpace)
+import           Data.List
+import           Data.List.NonEmpty        (NonEmpty ((:|)))
+import           Data.Maybe                (fromMaybe, isJust)
+import           Data.Proxy
+import           GHC.RTS.Flags             (MiscFlags (installSEHHandlers))
+import           System.Exit               (ExitCode (ExitSuccess))
+import           System.IO                 (FilePath)
+import           System.Process            (readProcessWithExitCode)
+import           Text.Megaparsec
+import           Text.Megaparsec.Pos
+import           Text.Megaparsec.Stream
 
 preprocess :: FilePath -> IO (Either String String)
 preprocess path = do
@@ -39,12 +39,6 @@ buildPreprocStream xs = PreprocStream xs True
 type CharEnteredCallback b = Char -> b -> b
 type LineMacroReadCallback b = Int -> String -> b -> b
 type ShouldStop b = Char -> b -> Bool
-
-deleteIfAtStart :: Char -> String -> String
-deleteIfAtStart _ "" = ""
-deleteIfAtStart c s@(x:xs)
-    | c == x = xs
-    | otherwise = s
 
 parseLineString :: String -> ((Int, FilePath), String )
 parseLineString = StateM.runState $ do
@@ -81,7 +75,7 @@ traverseStream charEntered lineRead shouldStop init s@(PreprocStream string last
         traverseStream' = traverseStream charEntered lineRead shouldStop
 
 instance Stream PreprocStream where
-    type Token PreprocStream = Char 
+    type Token PreprocStream = Char
     type Tokens PreprocStream = String
 
     tokenToChunk pxy tok = tokensToChunk pxy [tok]
@@ -91,13 +85,13 @@ instance Stream PreprocStream where
     chunkEmpty pxy = null
 
     take1_ stream = case traverseStream (\c _ -> Just c) (const $ const id) (const isJust) Nothing stream of
-        (Nothing, _) -> Nothing
+        (Nothing, _)      -> Nothing
         (Just x, stream') -> Just (x, stream')
 
     takeN_ n stream
       | n <= 0 = Just ("", stream)
       | otherwise = case traverseStream charEntered lineMacroRead shouldStop initState stream of
-              ((str, _), stream') -> 
+              ((str, _), stream') ->
                 let result = str ""
                 in if null result then
                   Nothing
@@ -108,7 +102,7 @@ instance Stream PreprocStream where
               lineMacroRead = const $ const id
               shouldStop _ (_,n') = n' >= n
               initState = (id, 0)
-    
+
     takeWhile_ p stream = case traverseStream charEntered lineMacroRead shouldStop initState stream of
             (str, stream') -> (str "", stream')
         where
@@ -128,10 +122,10 @@ expandTab ::
   String
 expandTab w' = go 0
   where
-    go 0 [] = []
+    go 0 []          = []
     go 0 ('\t' : xs) = go w xs
-    go 0 (x : xs) = x : go 0 xs
-    go n xs = ' ' : go (n - 1) xs
+    go 0 (x : xs)    = x : go 0 xs
+    go n xs          = ' ' : go (n - 1) xs
     w = unPos w'
 
 -- Taken from megaparsec's VisualStream internals
@@ -215,7 +209,7 @@ reachOffsetNoLine'
     )
     where
       ((spos, offset), post) = traverseStream charEntered lineRead shouldStop init pstateInput
-      charEntered ch (SourcePos n l c, offset) = 
+      charEntered ch (SourcePos n l c, offset) =
         let c' = unPos c
             w = unPos pstateTabWidth
         in if

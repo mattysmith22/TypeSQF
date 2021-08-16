@@ -1,11 +1,11 @@
 module Main where
 
-import Preproc
-import System.Environment
-import Text.Megaparsec
-import Control.Monad.Combinators
-import Data.Void
-import Text.Megaparsec.Error (errorBundlePretty)
+import           Control.Monad.Combinators
+import           Data.Void
+import           Preproc
+import           System.Environment
+import           Text.Megaparsec
+import           Text.Megaparsec.Error     (errorBundlePretty)
 
 readStream :: Parsec Void PreprocStream [(Char, SourcePos)]
 readStream = many $ do

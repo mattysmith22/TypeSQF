@@ -1,6 +1,6 @@
-import PreprocSpec
+import           PreprocSpec
 
-import Test.Hspec
+import           Test.Hspec
 
 main :: IO ()
-main = hspec preprocSpec 
+main = hspec preprocSpec

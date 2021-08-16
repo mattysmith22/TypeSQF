@@ -1,31 +1,34 @@
 module PreprocSpec (preprocSpec) where
 
-import Test.Hspec
-import Preproc
-import Text.Megaparsec
+import           Preproc
+import           Test.Hspec
+import           Text.Megaparsec
 
-streamStartLineMacro :: PreprocStream 
+streamStartLineMacro :: PreprocStream
 streamStartLineMacro = buildPreprocStream "#line 0 fileName\ntesting\nfile"
 
-streamNormal :: PreprocStream 
+streamNormal :: PreprocStream
 streamNormal = buildPreprocStream "testing\nfile"
 
-streamNewlines :: PreprocStream 
+streamNewlines :: PreprocStream
 streamNewlines = buildPreprocStream "\ntesting\nfile"
 
-streamMultipleStartLineMacro :: PreprocStream 
+streamMultipleStartLineMacro :: PreprocStream
 streamMultipleStartLineMacro = buildPreprocStream "#line 0 fileName\n#line 7 filename2\ntesting\nfile"
 
-streamEmpty :: PreprocStream 
+streamEmpty :: PreprocStream
 streamEmpty = buildPreprocStream ""
 
-streamEmptyMacro :: PreprocStream 
+streamEmptyMacro :: PreprocStream
 streamEmptyMacro = buildPreprocStream "#line 0 fileName\n#line 7 filename2\n"
 
-streamMidMacro :: PreprocStream 
+streamMidMacro :: PreprocStream
 streamMidMacro = buildPreprocStream "#line 0 fileName\ntest\n#line 7 filename2\ning\nfile"
 
-take1_Spec :: Spec 
+streamTabs :: PreprocStream
+streamTabs = buildPreprocStream "\ttab test\nt\test2\n\t\test3"
+
+take1_Spec :: Spec
 take1_Spec = describe "take1_" $ do
     it "Should be able to take a normal character" $ do
         take1_ streamNormal `shouldBe` Just ('t', PreprocStream "esting\nfile" False)
@@ -35,11 +38,11 @@ take1_Spec = describe "take1_" $ do
     it "Should be able to take a newline" $ do
         take1_ streamNewlines `shouldBe` Just ('\n', PreprocStream "testing\nfile" True)
     it "Should not be able to take from an empty string" $ do
-        take1_ streamEmpty`shouldBe` Nothing 
+        take1_ streamEmpty`shouldBe` Nothing
         take1_ streamEmptyMacro `shouldBe` Nothing
 
 {-# ANN takeN_Spec "HLint: Use camelCase" #-}
-takeN_Spec :: Spec 
+takeN_Spec :: Spec
 takeN_Spec = describe "takeN_" $ do
     it "Should always be able to parse a number of tokens <= 0" $ do
         takeN_ (-1) streamNormal `shouldBe` Just ("", streamNormal)
@@ -62,7 +65,7 @@ takeN_Spec = describe "takeN_" $ do
     it "Should be able to take characters through line directives" $ do
         takeN_ 8 streamMidMacro `shouldBe` Just ("test\ning", PreprocStream "\nfile" False)
 
-takeWhile_Spec :: Spec 
+takeWhile_Spec :: Spec
 takeWhile_Spec = describe "takeWhile_" $ do
     it "Should be able to correctly parse an empty stream" $ do
         takeWhile_ (const True) streamEmpty `shouldBe` ("", streamEmpty)
@@ -74,6 +77,7 @@ takeWhile_Spec = describe "takeWhile_" $ do
         takeWhile_ (const True) streamMidMacro `shouldBe` ("test\ning\nfile", PreprocStream "" False)
     it "Should listen to the predicate passed in" $ do
         takeWhile_ (`elem` "tes") streamNormal `shouldBe` ("test", PreprocStream "ing\nfile" False)
+cro = buildPreprocStream "#line 0 fileName\ntest\n#line 7 filename2\ning\nfile"
 
 genSourcePos :: FilePath -> Int -> Int -> SourcePos
 genSourcePos file l c = SourcePos file (mkPos l) (mkPos c)
@@ -87,7 +91,7 @@ genPosState stream = PosState {
     pstateLinePrefix = ""
 }
 
-reachOffsetSpec :: Spec 
+reachOffsetSpec :: Spec
 reachOffsetSpec = describe "reachOffset" $ do
     it "Should be able to correctly parse an empty stream" $ do
         reachOffset 1 (genPosState streamEmpty) `shouldBe` (Just "<empty line>", (genPosState streamEmpty){pstateOffset = 1})
@@ -116,8 +120,27 @@ reachOffsetSpec = describe "reachOffset" $ do
             pstateSourcePos = genSourcePos "fileName" 1 4,
             pstateLinePrefix = "tes"
         })
+    it "Should be able to correctly handle tabs" $ do
+        reachOffset 2 (genPosState streamTabs) `shouldBe` (Just "    tab test", (genPosState streamTabs){
+            pstateOffset = 2,
+            pstateInput = PreprocStream "ab test\nt\test2\n\t\test3" False,
+            pstateSourcePos = genSourcePos "" 1 6,
+            pstateLinePrefix = "\tt"
+        })
+        reachOffset 13 (genPosState streamTabs) `shouldBe` (Just "t    est2", (genPosState streamTabs){
+            pstateOffset = 13,
+            pstateInput = PreprocStream "st2\n\t\test3" False,
+            pstateSourcePos = genSourcePos "" 2 6,
+            pstateLinePrefix = "t\te"
+        })
+        reachOffset 20 (genPosState streamTabs) `shouldBe` (Just "        est3", (genPosState streamTabs){
+            pstateOffset = 20,
+            pstateInput = PreprocStream "st3" False,
+            pstateSourcePos = genSourcePos "" 3 10,
+            pstateLinePrefix = "\t\te"
+        })
 
-reachOffsetNoLineSpec :: Spec 
+reachOffsetNoLineSpec :: Spec
 reachOffsetNoLineSpec = describe "reachOffsetNoLine" $ do
     it "Should be able to correctly parse an empty stream" $ do
         reachOffsetNoLine 1 (genPosState streamEmpty) `shouldBe` (genPosState streamEmpty){pstateOffset = 1}
@@ -142,6 +165,22 @@ reachOffsetNoLineSpec = describe "reachOffsetNoLine" $ do
             pstateOffset = 3,
             pstateInput = PreprocStream "ting\nfile" False,
             pstateSourcePos = genSourcePos "fileName" 1 4
+        }
+    it "Should be able to correctly handle tabs" $ do
+        reachOffsetNoLine 2 (genPosState streamTabs) `shouldBe` (genPosState streamTabs){
+            pstateOffset = 2,
+            pstateInput = PreprocStream "ab test\nt\test2\n\t\test3" False,
+            pstateSourcePos = genSourcePos "" 1 6
+        }
+        reachOffsetNoLine 13 (genPosState streamTabs) `shouldBe` (genPosState streamTabs){
+            pstateOffset = 13,
+            pstateInput = PreprocStream "st2\n\t\test3" False,
+            pstateSourcePos = genSourcePos "" 2 6
+        }
+        reachOffsetNoLine 20 (genPosState streamTabs) `shouldBe` (genPosState streamTabs){
+            pstateOffset = 20,
+            pstateInput = PreprocStream "st3" False,
+            pstateSourcePos = genSourcePos "" 3 10
         }
 
 preprocStreamSpec :: Spec
